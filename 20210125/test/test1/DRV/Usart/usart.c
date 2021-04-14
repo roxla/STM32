@@ -1,0 +1,98 @@
+#include <myhead.h>
+
+struct __FILE
+{
+	int handle;
+};
+
+FILE __stdout;
+
+// 实现_sys_exit函数，避免使用半主机模式
+void _sys_exit(int x)
+{
+	x = x;
+}
+// 实现fputc
+int fputc(int ch, FILE *f)
+{
+    //通过串口1发送ch
+	USART_SendData(USART1, ch);
+	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE)!=SET);
+	
+	return ch;
+}
+// 初始化串口
+void usart_init(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct;
+	USART_InitTypeDef USART_InitStruct;
+	NVIC_InitTypeDef NVIC_InitStruct;
+	
+	// 开启时钟
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+	
+	// GPIO初始化成复用功能
+	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
+	GPIO_Init(GPIOA, &GPIO_InitStruct);
+	
+	// 复用映射为串口功能
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);
+	
+	// 初始化串口 115200 8N1
+	USART_InitStruct.USART_BaudRate = 115200; // 波特率
+	USART_InitStruct.USART_WordLength = USART_WordLength_8b; // 8位数据位
+	USART_InitStruct.USART_StopBits = USART_StopBits_1; // 1位停止位
+	USART_InitStruct.USART_Parity = USART_Parity_No; // 无校验
+	USART_InitStruct.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_InitStruct.USART_HardwareFlowControl = USART_HardwareFlowControl_None; // 无流控
+	USART_Init(USART1, &USART_InitStruct);
+	// 初始化NVIC
+	NVIC_InitStruct.NVIC_IRQChannel = USART1_IRQn; // USART1
+	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x2; // 抢占优先级
+	NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x2; // 响应优先级
+	NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStruct);
+	// 使能串口接收中断
+	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+	
+	// 使能串口
+	USART_Cmd(USART1,ENABLE);
+}
+// 发送一个字符
+void uart1_putc(char ch)
+{
+	// 等待上一个发送完成
+	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) != SET);
+	// 发送数据
+	USART_SendData(USART1, ch);
+}
+// 发送一个字符串
+void uart1_puts(const char *s)
+{
+	while(*s)
+		uart1_putc(*s++);
+}
+// 串口1中断处理函数
+void USART1_IRQHandler(void)
+{
+	u8 data;
+	
+	// 判断是不是串口接收中断
+	if(USART_GetFlagStatus(USART1, USART_IT_RXNE) == SET)
+	{
+		// 清除中断标志
+		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+		// 接收数据
+		data = USART_ReceiveData(USART1);
+		// 原路发回
+		uart1_putc(data);
+	}
+	// 发送换行
+//	uart1_puts("\r\n");
+}
