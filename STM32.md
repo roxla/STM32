@@ -679,7 +679,170 @@ int main(void)
 
 CAN
 
+```C
+void can1_init(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct;
+	NVIC_InitTypeDef NVIC_InitStruct;
+	CAN_InitTypeDef CAN_InitStruct;
+	CAN_FilterInitTypeDef CAN_FilterInitStruct;
+	
+	//1.开启时钟
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1, ENABLE);
+	
+	//2.初始化GPIO为CAN功能
+	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;//复用模式
+	GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1;
+	GPIO_Init(GPIOD, &GPIO_InitStruct);
+	
+	//复用映射为I2C功能
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource0, GPIO_AF_CAN1);
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource1, GPIO_AF_CAN1);
+	
+	//3.初始化CAN1 42M/4/(1+12+8) = 500K
+	CAN_InitStruct.CAN_Prescaler = 4;//4分频
+	CAN_InitStruct.CAN_Mode = CAN_Mode_Normal;//正常模式
+	CAN_InitStruct.CAN_SJW = CAN_SJW_1tq;//1tq
+	CAN_InitStruct.CAN_BS1 = CAN_BS1_12tq;
+	CAN_InitStruct.CAN_BS2 = CAN_BS2_8tq;
+	CAN_InitStruct.CAN_TTCM = DISABLE;//时间触发
+	CAN_InitStruct.CAN_ABOM = DISABLE;//自动离线
+	CAN_InitStruct.CAN_AWUM = DISABLE;//自动唤醒
+	CAN_InitStruct.CAN_NART = DISABLE;//自动重传
+	CAN_InitStruct.CAN_RFLM = DISABLE;//锁定接收
+	CAN_InitStruct.CAN_TXFP = DISABLE;//发送报文优先级
+	CAN_Init(CAN1,&CAN_InitStruct);
+	
+	//4.过滤器初始化
+//	CAN_FilterInitStruct.CAN_FilterIdHigh = 0x0;
+//	CAN_FilterInitStruct.CAN_FilterIdLow = 0x0;
+//	CAN_FilterInitStruct.CAN_FilterMaskIdHigh = 0x0;
+//	CAN_FilterInitStruct.CAN_FilterMaskIdLow = 0x0;
+//	CAN_FilterInitStruct.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;//使用FIFO0接收数据
+//	CAN_FilterInitStruct.CAN_FilterNumber = 0;//使用过滤器0
+//	CAN_FilterInitStruct.CAN_FilterMode = CAN_FilterMode_IdMask;//掩码模式
+//	CAN_FilterInitStruct.CAN_FilterScale = CAN_FilterScale_16bit;//过滤器长度
+//	CAN_FilterInitStruct.CAN_FilterActivation = ENABLE;//过滤器使能
+//	CAN_FilterInit(&CAN_FilterInitStruct);
+	
+	//16位列表模式 标准数据帧 IDE=0 RTR=0
+	//4个ID 0x000 0x123 0x321 0x7ab
+//	CAN_FilterInitStruct.CAN_FilterIdHigh = 0x0000;
+//	CAN_FilterInitStruct.CAN_FilterIdLow = 0x123<<5;
+//	CAN_FilterInitStruct.CAN_FilterMaskIdHigh = 0x321<<5;
+//	CAN_FilterInitStruct.CAN_FilterMaskIdLow = 0x7ab<<5;
+//	CAN_FilterInitStruct.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;//使用FIFO0接收数据
+//	CAN_FilterInitStruct.CAN_FilterNumber = 0;//使用过滤器0
+//	CAN_FilterInitStruct.CAN_FilterMode = CAN_FilterMode_IdList;
+//	CAN_FilterInitStruct.CAN_FilterScale = CAN_FilterScale_16bit;//过滤器长度
+//	CAN_FilterInitStruct.CAN_FilterActivation = ENABLE;//过滤器使能
+//	CAN_FilterInit(&CAN_FilterInitStruct);
+	
+	//32位列表模式 扩展数据帧 IDE=1 RTR=0
+	//2个ID 0x7890abc 0xcba0987
+	//0x7890abc<<3 | 0x1<<2
+//	CAN_FilterInitStruct.CAN_FilterIdHigh = 0x7890abc>>13;//ID高16位
+//	CAN_FilterInitStruct.CAN_FilterIdLow = ((0x7890abc<<3)&0xffff)|(0x1<<2);
+//	CAN_FilterInitStruct.CAN_FilterMaskIdHigh = 0xcba0987>>13;
+//	CAN_FilterInitStruct.CAN_FilterMaskIdLow = ((0xcba0987<<3)&0xffff)|(0x1<<2);
+//	CAN_FilterInitStruct.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;//使用FIFO0接收数据
+//	CAN_FilterInitStruct.CAN_FilterNumber = 0;//使用过滤器0
+//	CAN_FilterInitStruct.CAN_FilterMode = CAN_FilterMode_IdList;
+//	CAN_FilterInitStruct.CAN_FilterScale = CAN_FilterScale_32bit;//过滤器长度
+//	CAN_FilterInitStruct.CAN_FilterActivation = ENABLE;//过滤器使能
+//	CAN_FilterInit(&CAN_FilterInitStruct);
+	
+	//16位掩码模式 标准数据帧 IDE=0 RTR=0
+	//两个ID 0x123 0x321
+	CAN_FilterInitStruct.CAN_FilterIdHigh = 0x321<<5;//ID
+	CAN_FilterInitStruct.CAN_FilterIdLow = 0x123<<5;//ID
+	CAN_FilterInitStruct.CAN_FilterMaskIdHigh = 0xf0<<5;//MASK 0x*2* 
+	CAN_FilterInitStruct.CAN_FilterMaskIdLow = 0x70f<<5;//MASK 0x1*3
+	CAN_FilterInitStruct.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;//使用FIFO0接收数据
+	CAN_FilterInitStruct.CAN_FilterNumber = 0;//使用过滤器0
+	CAN_FilterInitStruct.CAN_FilterMode = CAN_FilterMode_IdMask;
+	CAN_FilterInitStruct.CAN_FilterScale = CAN_FilterScale_16bit;//过滤器长度
+	CAN_FilterInitStruct.CAN_FilterActivation = ENABLE;//过滤器使能
+	CAN_FilterInit(&CAN_FilterInitStruct);
+	
+	
+	//5.中断初始化 
+	NVIC_InitStruct.NVIC_IRQChannel = CAN1_RX0_IRQn;//CAN1接收中断通道0
+	NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x2;//抢占优先级
+	NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x2;//响应优先级
+	NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStruct);
+	//使能CAN1的FIFO0接收中断
+	CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);
+}
+
+CanTxMsg CAN1_TX_MSG;
+CanRxMsg CAN1_RX_MSG;
+
+//发送操作 0---成功  非0---失败
+u8 can1_send_message(u8 *data,u8 len,u32 message_id)
+{
+	u8 i,mailbox;
+	u32 cnt = 0;
+	
+	if(len>8)
+		return 1;
+	
+	//选择扩展帧/标准帧
+	if(message_id>0x7ff){//扩展帧
+		CAN1_TX_MSG.IDE = CAN_Id_Extended;
+	}
+	else{//标准帧
+		CAN1_TX_MSG.IDE = CAN_Id_Standard;
+	}
+	CAN1_TX_MSG.RTR = CAN_RTR_Data;//数据帧
+	CAN1_TX_MSG.DLC = len;//数据长度
+	CAN1_TX_MSG.StdId = message_id;//标准帧ID 11Bit
+	CAN1_TX_MSG.ExtId = message_id;//扩展帧ID 29Bit
+	for(i=0;i<len;i++){
+		CAN1_TX_MSG.Data[i] = data[i];
+	}
+	
+	//发送数据
+	mailbox = CAN_Transmit(CAN1,&CAN1_TX_MSG);
+	do{
+		cnt++;
+	}while((CAN_TransmitStatus(CAN1,mailbox)!=CAN_TxStatus_Ok)&&cnt<500);
+	
+	if(cnt<500){
+		return 0;
+	}
+	else{
+		return 1;
+	}
+}
+
+//接收中断
+void CAN1_RX0_IRQHandler(void)
+{
+	if(CAN_GetITStatus(CAN1, CAN_IT_FMP0)==SET){//收到数据
+		CAN_Receive(CAN1,CAN_FIFO0,&CAN1_RX_MSG);
+		//处理收到的数据 ----- 原路发回
+		if(CAN1_RX_MSG.IDE==CAN_Id_Standard)//标准帧
+			can1_send_message(CAN1_RX_MSG.Data,CAN1_RX_MSG.DLC,CAN1_RX_MSG.StdId);
+		else if(CAN1_RX_MSG.IDE==CAN_Id_Extended)
+			can1_send_message(CAN1_RX_MSG.Data,CAN1_RX_MSG.DLC,CAN1_RX_MSG.ExtId);
+		
+		CAN_ClearITPendingBit(CAN1,CAN_IT_FMP0);//清除中断标志
+	}
+}
+
+can1_init();
+can1_send_message(buf,3,0x7f4);
 ```
+
+PWM
+
+```C
 
 ```
 
